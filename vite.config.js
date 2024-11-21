@@ -15,7 +15,6 @@ export default defineConfig({
     esbuild: {
         loader: 'jsx',
         include: /src\/.*\.jsx?$/,
-        exclude: [],
     },
     optimizeDeps: {
         esbuildOptions: {
@@ -35,12 +34,6 @@ export default defineConfig({
             ],
         },
     },
-
-
-    
-    // plugins: [react(),svgr({
-    //   exportAsDefault: true
-    // })],
 
     plugins: [svgr(), react()],
 });
