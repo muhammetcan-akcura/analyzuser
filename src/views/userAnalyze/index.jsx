@@ -337,7 +337,7 @@ const ExcelProcessor = () => {
             </ActionButton>
           </label>
           <Typography variant="body1" sx={{ marginTop: 2, color: 'text.secondary' }}>
-            Drag and drop your Excel file here, or click to select
+            Drag and drop your Excel file here, or click to selec
           </Typography>
         </DropZone>
       ) : (
