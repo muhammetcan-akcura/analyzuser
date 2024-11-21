@@ -12,9 +12,9 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^6.1.8",
+    "@mui/icons-material": "6.1.8",
     "@mui/lab": "5.0.0-alpha.133",
-    "@mui/material": "5.13.4",
+    "@mui/material": "6.1.8",
     "@mui/system": "^5.14.11",
     "@svgr/rollup": "^8.1.0",
     "@tabler/icons-react": "^2.35.0",
