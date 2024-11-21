@@ -4,7 +4,6 @@ import { resolve } from 'path';
 import fs from 'fs/promises';
 import svgr from '@svgr/rollup';
 // import svgr from 'vite-plugin-svgr'
-
 // https://vitejs.dev/config/
 export default defineConfig({
     resolve: {
@@ -15,6 +14,7 @@ export default defineConfig({
     esbuild: {
         loader: 'jsx',
         include: /src\/.*\.jsx?$/,
+        exclude: [],
     },
     optimizeDeps: {
         esbuildOptions: {
@@ -34,6 +34,9 @@ export default defineConfig({
             ],
         },
     },
-
+    
+    // plugins: [react(),svgr({
+    //   exportAsDefault: true
+    // })],
     plugins: [svgr(), react()],
 });
