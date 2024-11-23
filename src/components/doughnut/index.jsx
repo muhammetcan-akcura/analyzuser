@@ -5,7 +5,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Card, CardContent, CardHeader } from '@mui/material'
 
 export default function StatusRatioChart({ data }) {
-    console.log(data, "data")
 
     // Renkler her statüye göre dinamik olarak ayarlanabilir
     const COLORS = {
