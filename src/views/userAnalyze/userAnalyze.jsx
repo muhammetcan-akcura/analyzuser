@@ -1,64 +1,26 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState } from 'react'
 import { read, utils } from 'xlsx'
 import {
-  Button,
-  Typography,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
+  Typography,
+  Box,
+  Button,
+  Paper,
+  Tabs,
+  Tab
 } from '@mui/material'
-import { CloudUpload } from '@mui/icons-material'
-import MUILineChart from '../../components/lineCharts'
-import DataSummary from '../../components/charged'
-import MUIDoughnutChart from '../../components/doughnut'
-import MUILoader from '../../components/loader'
 
-const ExcelProcessor = () => {
-  const [usernames, setUsernames] = useState([])
-  const [filteredOrders, setFilteredOrders] = useState([])
-  const [providers, setProviders] = useState([])
-  const [username, setUsername] = useState("")
-  const [provider, setProvider] = useState("")
-  const [services, setServices] = useState([])
-  const [userServices, setUserServices] = useState([])
-  const [userDoughnotServices, setDoughnotUserServices] = useState([])
-  const [userServicesID, setUserServicesID] = useState(0)
-  const [data, setData] = useState([])
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
-  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })  // Sorting state
-
-  const [chargeFilter, setChargeFilter] = useState('')
-  const [quantityFilter, setQuantityFilter] = useState('')
-
+const DataAnalyzer = () => {
+  const [analysisReport, setAnalysisReport] = useState(null)
   const [openModal, setOpenModal] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [loadingMessage, setLoadingMessage] = useState('')
-  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [activeMonthTab, setActiveMonthTab] = useState(0)
+  const [activeServiceTab, setActiveServiceTab] = useState(0)
 
-  const updateLoadingProgress = (progress) => {
-    setLoadingProgress(progress)
-  }
-
-  const handleFileUpload = useCallback((file) => {
-    setIsLoading(true)
-    setLoadingProgress(0)
+  const analyzeExcelData = (file) => {
     const reader = new FileReader()
     reader.onload = (evt) => {
       const bstr = evt.target.result
@@ -74,298 +36,168 @@ const ExcelProcessor = () => {
           return obj
         }, {})
       )
-      setData(rows)
-      const uniqueNames = [...new Set(rows.map(item => item.User))]
-      const uniqueProviders = [...new Set(rows.map(item => item.Provider))]
-      setUsernames(uniqueNames)
-      setProviders(uniqueProviders)
 
-      setIsLoading(false)
-      setLoadingMessage('')
-      setLoadingProgress(100)
-    }
-    reader.onprogress = (evt) => {
-      if (evt.lengthComputable) {
-        const percentLoaded = Math.round((evt.loaded / evt.total) * 100)
-        updateLoadingProgress(percentLoaded)
-      }
+      const report = generateComprehensiveReport(rows)
+      setAnalysisReport(report)
+      setOpenModal(true)
     }
     reader.readAsBinaryString(file)
-  }, [])
+  }
 
-  useEffect(() => {
-    const filteredOrders = data.filter(item => {
-      let matches = true
-      if (provider && item.Provider !== provider) {
-        matches = false
+  const generateComprehensiveReport = (data) => {
+    const monthlyServiceData = {}
+    data.forEach(item => {
+      const itemDate = new Date(item.Created)
+      const monthKey = `${itemDate.getFullYear()}-${itemDate.getMonth() + 1}`
+
+      if (!monthlyServiceData[monthKey]) {
+        monthlyServiceData[monthKey] = {
+          services: new Set(),
+          serviceDetails: {}
+        }
       }
-      if (username && item.User !== username) {
-        matches = false
+
+      monthlyServiceData[monthKey].services.add(item.Service)
+
+      if (!monthlyServiceData[monthKey].serviceDetails[item.Service]) {
+        monthlyServiceData[monthKey].serviceDetails[item.Service] = {
+          quantity: 0,
+          totalCharge: 0,
+          users: new Set(),
+          providers: new Set()
+        }
       }
-      if (chargeFilter && item.Charge < chargeFilter) {
-        matches = false
-      }
-      if (quantityFilter && item.Quantity < quantityFilter) {
-        matches = false
-      }
-      return matches
+      const serviceDetail = monthlyServiceData[monthKey].serviceDetails[item.Service]
+      serviceDetail.quantity += 1
+      serviceDetail.totalCharge += item.Charge || 0
+      serviceDetail.users.add(item.User)
+      serviceDetail.providers.add(item.Provider)
     })
-    setFilteredOrders(filteredOrders)
 
-    const servicesMap = filteredOrders.reduce((acc, item) => {
-      if (!acc.has(item.Service_ID)) {
-        acc.set(item.Service_ID, {
-          Service_ID: item.Service_ID,
-          Service: item.Service,
-          totalCost: item.Cost,
-          totalCharge: item.Charge,
-          quantity: 1,
-          latestCreated: item.Created
-        })
-      } else {
-        const existingService = acc.get(item.Service_ID)
-        existingService.totalCost += item.Cost
-        existingService.totalCharge += item.Charge
-        existingService.quantity += 1
+    const sortedMonths = Object.keys(monthlyServiceData).sort()
+    const monthlyComparison = []
 
-        if (new Date(item.Created) > new Date(existingService.latestCreated)) {
-          existingService.latestCreated = item.Created
-        }
+    let accumulatedPreviousServices = new Set()
+
+    for (let i = 1; i < sortedMonths.length; i++) {
+      const currentMonth = sortedMonths[i]
+      const currentMonthServices = monthlyServiceData[currentMonth].services
+
+      const comparisonReport = {
+        currentMonth: currentMonth,
+        newServices: [],
+        discontinuedServices: []
       }
-      return acc
-    }, new Map())
 
-    setServices([...servicesMap.values()])
-  }, [username, provider, chargeFilter, quantityFilter, data])
+      comparisonReport.newServices = [...currentMonthServices]
+        .filter(service => !accumulatedPreviousServices.has(service))
 
-  useEffect(() => {
-    if (userServicesID !== 0) {
-      const filteredOrders = data.filter(item => {
-        if (provider && username) {
-          return item.User === username && item.Provider === provider
-        } else if (provider && !username) {
-          return item.Provider === provider
-        } else if (!provider && username) {
-          return item.User === username
-        }
-        return true
-      })
-      setUserServices(filteredOrders.filter(item => item.Service_ID === userServicesID).map(({ Created, Charge, Status, Service, User, Provider }) => ({ Created, Charge, Status, Service, User, Provider })))
-      setDoughnotUserServices(filteredOrders.filter(item => item.Service_ID === userServicesID).map(({ Created, Charge, Status }) => ({ Created, Charge, Status })))
+      comparisonReport.discontinuedServices = [...accumulatedPreviousServices]
+        .filter(service => !currentMonthServices.has(service))
+
+      accumulatedPreviousServices = new Set([...accumulatedPreviousServices, ...currentMonthServices])
+
+      monthlyComparison.push(comparisonReport)
     }
-  }, [userServicesID])
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage)
+    return monthlyComparison
   }
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10))
-    setPage(0)
-  }
-
-  const handleSort = (column) => {
-    const direction = sortConfig.key === column && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-    setSortConfig({ key: column, direction })
-  };
-
-  // Sort services based on sortConfig
-  const sortedServices = [...services].sort((a, b) => {
-    const isAscending = sortConfig.direction === 'asc';
-    if (sortConfig.key === 'totalCharge') {
-      return isAscending
-        ? a.totalCharge - b.totalCharge
-        : b.totalCharge - a.totalCharge;
-    }
-    if (sortConfig.key === 'quantity') {
-      return isAscending
-        ? a.quantity - b.quantity
-        : b.quantity - a.quantity;
-    }
-    if (sortConfig.key === 'latestCreated') {
-      const dateA = new Date(a.latestCreated)
-      const dateB = new Date(b.latestCreated)
-      return isAscending ? dateA - dateB : dateB - dateA
-    }
-    return 0;
-  });
-
-  const openChartModal = () => {
-    setOpenModal(true)
-  }
-
-  const closeChartModal = () => {
-    setOpenModal(false)
-  }
+  const renderServiceList = (services) => (
+    <ul className="list-disc pl-5">
+      {services.map((service, index) => (
+        <li key={index} className="mb-1">
+          <Typography variant="body1">{service}</Typography>
+        </li>
+      ))}
+    </ul>
+  )
 
   return (
-    <Box className="container mx-auto py-10">
-      {
-        !data.length ? (
-          <Paper className="mb-8 p-6 ">
-            <Box className="flex items-center justify-center w-full">
-              {isLoading ? (
-                <Box className="flex flex-col items-center justify-center">
-                  <MUILoader progress={loadingProgress} />
-                  <Typography variant="body1" className="mt-4">{loadingMessage}</Typography>
-                </Box>
-              ) : !data.length ? (
-                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                  <Box className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <CloudUpload className="w-10 h-10 mb-4 text-gray-500" />
-                    <Typography variant="body1" className="mb-2 text-sm text-gray-500">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
-                    </Typography>
-                    <Typography variant="body2" className="text-xs text-gray-500">
-                      XLSX or XLS
-                    </Typography>
-                  </Box>
-                  <input
-                    id="dropzone-file"
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx, .xls"
-                    onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
+    <Box className="container mx-auto p-6">
+      <Paper elevation={3} className="p-6 text-center">
+        <input
+          type="file"
+          accept=".xlsx, .xls"
+          onChange={(e) => e.target.files && analyzeExcelData(e.target.files[0])}
+          className="mb-4"
+        />
+      </Paper>
+
+      <Dialog
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle className="bg-blue-50 border-b">
+          <Typography variant="h4" className="font-bold text-blue-800">
+            Aylık Servis Kullanım Raporu
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {analysisReport && (
+            <Box>
+              <Tabs
+                value={activeMonthTab}
+                onChange={(e, newValue) => setActiveMonthTab(newValue)}
+                variant="scrollable"
+                scrollButtons="auto"
+              >
+                {analysisReport.map((monthReport, index) => (
+                  <Tab
+                    key={index}
+                    label={`${monthReport.currentMonth} Raporu`}
                   />
-                </label>
-              ) : null}
+                ))}
+              </Tabs>
+
+              {analysisReport.map((monthReport, monthIndex) => (
+                activeMonthTab === monthIndex && (
+                  <Box key={monthIndex} className="mt-4">
+                    <Tabs
+                      value={activeServiceTab}
+                      onChange={(e, newValue) => setActiveServiceTab(newValue)}
+                    >
+                      <Tab label="Kullanılmaya Başlanan Servisler" />
+                      <Tab label="Kullanılmayı Bırakılan Servisler" />
+                    </Tabs>
+
+                    {activeServiceTab === 0 && (
+                      <Paper elevation={3} className="p-4 mt-4">
+                        <Typography variant="h6">
+                          Kullanılmaya Başlanan Servisler
+                        </Typography>
+                        {renderServiceList(monthReport.newServices)}
+                      </Paper>
+                    )}
+
+                    {activeServiceTab === 1 && (
+                      <Paper elevation={3} className="p-4 mt-4">
+                        <Typography variant="h6">
+                          Kullanılmayı Bırakılan Servisler
+                        </Typography>
+                        {renderServiceList(monthReport.discontinuedServices)}
+                      </Paper>
+                    )}
+                  </Box>
+                )
+              ))}
             </Box>
-          </Paper>
-        ) : null
-      }
-
-      {!isLoading && data.length > 0 && (
-        <>
-          <Box className="flex space-x-4 mb-8">
-            <FormControl className="w-1/2">
-              <InputLabel id="username-select-label">Username</InputLabel>
-              <Select
-                labelId="username-select-label"
-                value={username}
-                label="Username"
-                onChange={(e) => setUsername(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {usernames.map((item, i) => (
-                  <MenuItem key={i} value={item}>
-                    {item}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl className="w-1/2">
-              <InputLabel id="provider-select-label">Provider</InputLabel>
-              <Select
-                labelId="provider-select-label"
-                value={provider}
-                label="Provider"
-                onChange={(e) => setProvider(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {providers.map((item, i) => (
-                  <MenuItem key={i} value={item}>
-                    {item}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <div>
-            <DataSummary data={filteredOrders} />
-          </div>
-
-          <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Service ID</TableCell>
-                  <TableCell>Service</TableCell>
-                  <TableCell onClick={() => handleSort('totalCharge')} style={{ cursor: 'pointer' }}>
-                    Total Charge
-                  </TableCell>
-                  <TableCell onClick={() => handleSort('quantity')} style={{ cursor: 'pointer' }}>
-                    Quantity
-                  </TableCell>
-                  <TableCell onClick={() => handleSort('latestCreated')} style={{ cursor: 'pointer' }}>
-                    Latest Created
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sortedServices
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((row) => {
-                    // Tarih formatını doğru şekilde analiz etmek için Date nesnesi kullanıyoruz
-                    const latestCreatedDate = new Date(row.latestCreated);
-                    const today = new Date();
-
-                    // Tarihler arasındaki farkı hesaplamak
-                    const differenceInTime = today.getTime() - latestCreatedDate.getTime();
-                    const differenceInDays = differenceInTime / (1000 * 3600 * 24);  // Gün farkını hesapla
-
-                    // Eğer fark 3 gün veya daha fazla ise, satırı kırmızı yap
-                    const rowStyle = differenceInDays >= 3 ? { backgroundColor: '#ff9999' } : {};
-
-                    return (
-                      <TableRow
-                        onClick={() => {
-                          setUserServicesID(row.Service_ID);
-                          openChartModal();
-                        }}
-                        key={row.Service_ID}
-                        className='cursor-pointer'
-                        style={rowStyle} // Satır rengini koşula göre ayarlıyoruz
-                      >
-                        <TableCell>{row.Service_ID}</TableCell>
-                        <TableCell>{row.Service}</TableCell>
-                        <TableCell>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.totalCharge)}</TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                        <TableCell>{new Date(row.latestCreated).toLocaleDateString()}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50, 100, 1000]}
-            component="div"
-            count={sortedServices.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-
-          <Dialog open={openModal} onClose={closeChartModal} maxWidth="xl" fullWidth>
-            <DialogTitle>Service Data Overview</DialogTitle>
-            <DialogContent>
-              <Box className="flex">
-                <Box className="flex-1" style={{ flex: 2 }}>
-                  <MUILineChart data={userServices} />
-                </Box>
-                <Box className="flex-1" style={{ flex: 1 }}>
-                  <MUIDoughnutChart data={userDoughnotServices} />
-                </Box>
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeChartModal} color="primary">Close</Button>
-            </DialogActions>
-          </Dialog>
-        </>
-      )}
+          )}
+        </DialogContent>
+        <Box className="p-4 bg-gray-100 flex justify-end">
+          <Button
+            onClick={() => setOpenModal(false)}
+            variant="contained"
+            color="primary"
+          >
+            Kapat
+          </Button>
+        </Box>
+      </Dialog>
     </Box>
   )
 }
 
-export default ExcelProcessor
+export default DataAnalyzer

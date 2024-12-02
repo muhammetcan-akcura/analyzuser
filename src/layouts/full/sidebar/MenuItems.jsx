@@ -1,5 +1,5 @@
 import {
-  IconAperture, IconCopy, IconLayoutDashboard, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUserPlus
+  IconAperture, IconCopy, IconLayoutDashboard, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
 } from '@tabler/icons-react';
 
 import { uniqueId } from 'lodash';
@@ -13,6 +13,12 @@ const Menuitems = [
     id: uniqueId(),
     title: 'Order Analyze',
     icon: IconMenuOrder,
+    href: '/order-analyze',
+  },
+  {
+    id: uniqueId(),
+    title: 'User Analyze',
+    icon: IconUser,
     href: '/user-analyze',
   },
 
@@ -22,7 +28,7 @@ const Menuitems = [
     icon: IconLayoutDashboard,
     href: '/dashboard',
   },
-  
+
   {
     navlabel: true,
     subheader: 'Utilities',

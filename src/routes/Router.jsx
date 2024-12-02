@@ -24,6 +24,7 @@ const Router = [
     children: [
       { path: '/', element: <Navigate to="/dashboard" /> },
       { path: '/dashboard', exact: true, element: <Dashboard /> },
+      { path: '/order-analyze', exact: true, element: <UserAnalyze /> },
       { path: '/user-analyze', exact: true, element: <UserAnalyze /> },
       { path: '/sample-page', exact: true, element: <SamplePage /> },
       { path: '/icons', exact: true, element: <Icons /> },
