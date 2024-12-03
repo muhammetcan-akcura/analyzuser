@@ -1,426 +1,371 @@
-import React, { useState, useCallback } from 'react';
-import { 
-  Button, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper, 
+import React, { useState, useCallback, useEffect } from 'react'
+import { read, utils } from 'xlsx'
+import {
+  Button,
   Typography,
   Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TablePagination,
-  styled,
-  Modal,
-  Fade,
-  Backdrop
-} from '@mui/material';
-import { CloudUpload, Download, Delete } from '@mui/icons-material';
-import { read, utils, write } from 'xlsx';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
-const primaryColor = '#5D87FF';
-const deleteColor = '#FF5D5D';
-const downloadColor = '#5DFF7F';
-
-const DropZone = styled(Box)(({ theme }) => ({
-  border: `2px dashed ${primaryColor}`,
-  borderRadius: theme.shape.borderRadius,
-  padding: theme.spacing(6),
-  textAlign: 'center',
-  cursor: 'pointer',
-  transition: 'all 0.3s ease',
-  backgroundColor: 'rgba(93, 135, 255, 0.05)',
-  '&:hover': {
-    backgroundColor: 'rgba(93, 135, 255, 0.1)',
-    transform: 'scale(1.02)',
-  },
-}));
-
-const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
-  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-  borderRadius: theme.shape.borderRadius,
-  overflow: 'hidden',
-  marginBottom: theme.spacing(3),
-}));
-
-const StyledTableHead = styled(TableHead)({
-  backgroundColor: primaryColor,
-});
-
-const StyledTableCell = styled(TableCell)({
-  color: 'white',
-  fontWeight: 'bold',
-  cursor: 'pointer',
-  '&:hover': {
-    
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-});
-
-const StyledTableRow = styled(TableRow)({
-  '&:nth-of-type(odd)': {
-    cursor: 'pointer',
-    backgroundColor: 'rgba(93, 135, 255, 0.05)',
-  },
-  '&:hover': {
-    cursor: 'pointer',
-    backgroundColor: 'rgba(93, 135, 255, 0.1)',
-  },
-});
-
-const ActionButton = styled(Button)({
-  margin: '10px',
-  padding: '10px 20px',
-  fontWeight: 'bold',
-});
-
-const ModalContent = styled(Box)(({ theme }) => ({
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: '80%',
-  maxWidth: 800,
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-  padding: theme.spacing(4),
-  borderRadius: theme.shape.borderRadius,
-}));
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+} from '@mui/material'
+import { CloudUpload } from '@mui/icons-material'
+import MUILineChart from '../../components/lineCharts'
+import DataSummary from '../../components/charged'
+import MUIDoughnutChart from '../../components/doughnut'
+import MUILoader from '../../components/loader'
 
 const ExcelProcessor = () => {
-    const [data, setData] = useState([]);
-    const [columns, setColumns] = useState([]);
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [modalOpen, setModalOpen] = useState(false);
-    const [selectedData, setSelectedData] = useState(null);
-    const [sortConfig, setSortConfig] = useState({ key: 'countSum', direction: 'asc' });
-  
-    // Excel dosyasından veri yükleme
-    const handleFileUpload = useCallback((file) => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target?.result;
-        const wb = read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = utils.sheet_to_json(ws, { header: 1 });
-  
-        if (data.length > 0) {
-          const headers = data[0];
-          const rows = data.slice(1).map((row) =>
-            headers.reduce((obj, header, index) => {
-              obj[header] = row[index];
-              return obj;
-            }, {})
-          );
-  
-          const aggregatedData = rows.reduce((acc, obj) => {
-            if (!acc[obj.Service_ID]) {
-              acc[obj.Service_ID] = {
-                name: obj.Service,
-                countSum: 0,
-                occurrences: 0,
-                data: [],
-              };
-            }
-            acc[obj.Service_ID].countSum += Number(obj.Charge.toFixed(0)) || 0;
-            acc[obj.Service_ID].occurrences += 1;
-            acc[obj.Service_ID].data.push(obj);
-            return acc;
-          }, {});
-  
-          const result = Object.entries(aggregatedData).map(
-            ([id, { name, countSum, occurrences, data }]) => ({
-              id: Number(id),
-              name,
-              countSum,
-              occurrences,
-              data,
-            })
-          );
-          setColumns([
-            { id: 'id', label: 'ID' },
-            { id: 'name', label: 'Name' },
-            { id: 'countSum', label: 'Total Count' },
-            { id: 'occurrences', label: 'Occurrences' },
-          ]);
-          setData(result);
-        }
-      };
-      reader.readAsBinaryString(file);
-    }, []);
-  
-    // Veri sıralama işlevi
-    const handleSort = (columnKey) => {
-      let direction = 'asc';
-      if (sortConfig.key === columnKey && sortConfig.direction === 'asc') {
-        direction = 'desc';
-      }
-  
-      setSortConfig({ key: columnKey, direction });
-  
-      const sortedData = [...data].sort((a, b) => {
-        if (a[columnKey] < b[columnKey]) return direction === 'asc' ? -1 : 1;
-        if (a[columnKey] > b[columnKey]) return direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-  
-      setData(sortedData);
-    };
-  
-    // Son tarihleri kontrol et ve renkli gösterim ekle
-    const getRowStyle = (row) => {
-      const lastDate = row.data[row.data.length - 1]?.Created;
-      const today = new Date();
-      const threeDaysAgo = new Date(today.setDate(today.getDate() - 3));
-      return new Date(lastDate) < threeDaysAgo ? { backgroundColor: '#FFCDD2', color: 'white' } : {};
-    };
-  
-    const handleDownload = useCallback(() => {
-      const ws = utils.json_to_sheet(data, { header: columns.map(col => col.id) });
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, "Sheet1");
-      
-      const fileName = 'processed_data.xlsx';
-      const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = href;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, [columns, data]);
-  
-    const handleDeleteData = useCallback(() => {
-      setData([]);
-      setColumns([]);
-    }, []);
-  
-    const handleChangePage = (event, newPage) => {
-      setPage(newPage);
-    };
-  
-    const handleChangeRowsPerPage = (event) => {
-      setRowsPerPage(parseInt(event.target.value, 10));
-      setPage(0);
-    };
-  
-    const handleRowClick = (row) => {
-      setSelectedData(row);
-      setModalOpen(true);
-      console.log(row)
-    };
-    
-  
-    const handleCloseModal = () => {
-      setModalOpen(false);
-    };
-  
-    const getChartData = (rowData) => {
-      if (!rowData || !rowData.data) return null;
-  
-      const groupedData = rowData.data.reduce((acc, item) => {
-        const date = new Date(item.Created).toLocaleDateString();
-        if (!acc[date]) {
-          acc[date] = { chargeSum: 0, count: 0 };
-        }
-        acc[date].chargeSum += item.Charge;
-        acc[date].count += 1;
-        return acc;
-      }, {});
-  
-      const dates = Object.keys(groupedData);
-      const charges = dates.map(date => groupedData[date].chargeSum);
-      const counts = dates.map(date => groupedData[date].count);
-  
-      return {
-        labels: dates,
-        datasets: [
-          {
-            label: 'Charge',
-            data: charges,
-            fill: false,
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1
-          },
-          {
-            label: 'Occurrences',
-            data: counts,
-            fill: false,
-            borderColor: 'rgb(255, 99, 132)',
-            tension: 0.1
-          }
-        ]
-      };
-    };
+  const [usernames, setUsernames] = useState([])
+  const [filteredOrders, setFilteredOrders] = useState([])
+  const [providers, setProviders] = useState([])
+  const [username, setUsername] = useState("")
+  const [provider, setProvider] = useState("")
+  const [services, setServices] = useState([])
+  const [userServices, setUserServices] = useState([])
+  const [userDoughnotServices, setDoughnotUserServices] = useState([])
+  const [userServicesID, setUserServicesID] = useState(0)
+  const [data, setData] = useState([])
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
+  const [maxDate, setMaxDate] = useState(null)
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Charge Over Time',
-        color: primaryColor,
-        font: {
-          size: 18,
-          weight: 'bold',
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(93, 135, 255, 0.1)',
-        },
-      },
-      y: {
-        grid: {
-          color: 'rgba(93, 135, 255, 0.1)',
-        },
-      },
-    },
+  const [chargeFilter, setChargeFilter] = useState('')
+  const [quantityFilter, setQuantityFilter] = useState('')
+
+  const [openModal, setOpenModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState('')
+  const [loadingProgress, setLoadingProgress] = useState(0)
+
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress)
+  }
+
+  const handleFileUpload = useCallback((file) => {
+    setIsLoading(true)
+    setLoadingProgress(0)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const bstr = evt.target.result
+      const wb = read(bstr, { type: 'binary' })
+      const wsname = wb.SheetNames[0]
+      const ws = wb.Sheets[wsname]
+      const data = utils.sheet_to_json(ws, { header: 1 })
+
+      const headers = data[0]
+      const rows = data.slice(1).map((row) =>
+        headers.reduce((obj, header, index) => {
+          obj[header] = row[index]
+          return obj
+        }, {})
+      )
+      setData(rows)
+      const uniqueNames = [...new Set(rows.map(item => item.User))]
+      const uniqueProviders = [...new Set(rows.map(item => item.Provider))]
+      setUsernames(uniqueNames)
+      setProviders(uniqueProviders)
+
+      // Find the maximum date in the dataset
+      const maxCreatedDate = new Date(Math.max(
+        ...rows.map(item => new Date(item.Created))
+      ))
+      setMaxDate(maxCreatedDate)
+
+      setIsLoading(false)
+      setLoadingMessage('')
+      setLoadingProgress(100)
+    }
+    reader.onprogress = (evt) => {
+      if (evt.lengthComputable) {
+        const percentLoaded = Math.round((evt.loaded / evt.total) * 100)
+        updateLoadingProgress(percentLoaded)
+      }
+    }
+    reader.readAsBinaryString(file)
+  }, [])
+
+  useEffect(() => {
+    const filteredOrders = data.filter(item => {
+      let matches = true
+      if (provider && item.Provider !== provider) {
+        matches = false
+      }
+      if (username && item.User !== username) {
+        matches = false
+      }
+      if (chargeFilter && item.Charge < chargeFilter) {
+        matches = false
+      }
+      if (quantityFilter && item.Quantity < quantityFilter) {
+        matches = false
+      }
+      return matches
+    })
+    setFilteredOrders(filteredOrders)
+
+    const servicesMap = filteredOrders.reduce((acc, item) => {
+      if (!acc.has(item.Service_ID)) {
+        acc.set(item.Service_ID, {
+          Service_ID: item.Service_ID,
+          Service: item.Service,
+          totalCost: item.Cost,
+          totalCharge: item.Charge,
+          quantity: 1,
+          latestCreated: item.Created
+        })
+      } else {
+        const existingService = acc.get(item.Service_ID)
+        existingService.totalCost += item.Cost
+        existingService.totalCharge += item.Charge
+        existingService.quantity += 1
+
+        if (new Date(item.Created) > new Date(existingService.latestCreated)) {
+          existingService.latestCreated = item.Created
+        }
+      }
+      return acc
+    }, new Map())
+
+    setServices([...servicesMap.values()])
+  }, [username, provider, chargeFilter, quantityFilter, data])
+
+  useEffect(() => {
+    if (userServicesID !== 0) {
+      const filteredOrders = data.filter(item => {
+        if (provider && username) {
+          return item.User === username && item.Provider === provider
+        } else if (provider && !username) {
+          return item.Provider === provider
+        } else if (!provider && username) {
+          return item.User === username
+        }
+        return true
+      })
+      setUserServices(filteredOrders.filter(item => item.Service_ID === userServicesID).map(({ Created, Charge, Status, Service, User, Provider }) => ({ Created, Charge, Status, Service, User, Provider })))
+      setDoughnotUserServices(filteredOrders.filter(item => item.Service_ID === userServicesID).map(({ Created, Charge, Status }) => ({ Created, Charge, Status })))
+    }
+  }, [userServicesID])
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage)
+  }
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10))
+    setPage(0)
+  }
+
+  const handleSort = (column) => {
+    const direction = sortConfig.key === column && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    setSortConfig({ key: column, direction })
   };
 
+  const sortedServices = [...services].sort((a, b) => {
+    const isAscending = sortConfig.direction === 'asc';
+    if (sortConfig.key === 'totalCharge') {
+      return isAscending
+        ? a.totalCharge - b.totalCharge
+        : b.totalCharge - a.totalCharge;
+    }
+    if (sortConfig.key === 'quantity') {
+      return isAscending
+        ? a.quantity - b.quantity
+        : b.quantity - a.quantity;
+    }
+    if (sortConfig.key === 'latestCreated') {
+      const dateA = new Date(a.latestCreated)
+      const dateB = new Date(b.latestCreated)
+      return isAscending ? dateA - dateB : dateB - dateA
+    }
+    return 0;
+  });
+
+  const openChartModal = () => {
+    setOpenModal(true)
+  }
+
+  const closeChartModal = () => {
+    setOpenModal(false)
+  }
+
   return (
-    <Box sx={{ padding: 3, backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-      {data.length === 0 ? (
-        <DropZone
-          onDrop={(e) => {
-            e.preventDefault();
-            handleFileUpload(e.dataTransfer.files[0]);
-          }}
-          onDragOver={(e) => e.preventDefault()}
-        >
-          <input
-            accept=".xlsx, .xls"
-            style={{ display: 'none' }}
-            id="raised-button-file"
-            type="file"
-            onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
-          />
-          <label htmlFor="raised-button-file">
-            <ActionButton
-              variant="contained"
-              component="span"
-              startIcon={<CloudUpload />}
-              sx={{ backgroundColor: primaryColor, '&:hover': { backgroundColor: '#4D77EF' } }}
-            >
-              Upload Excel
-            </ActionButton>
-          </label>
-          <Typography variant="body1" sx={{ marginTop: 2, color: 'text.secondary' }}>
-            Drag and drop your Excel file here, or click to selec
-          </Typography>
-        </DropZone>
-      ) : (
+    <Box className="container mx-auto py-10">
+      {
+        !data.length ? (
+          <Paper className="mb-8 p-6 ">
+            <Box className="flex items-center justify-center w-full">
+              {isLoading ? (
+                <Box className="flex flex-col items-center justify-center">
+                  <MUILoader progress={loadingProgress} />
+                  <Typography variant="body1" className="mt-4">{loadingMessage}</Typography>
+                </Box>
+              ) : !data.length ? (
+                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                  <Box className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <CloudUpload className="w-10 h-10 mb-4 text-gray-500" />
+                    <Typography variant="body1" className="mb-2 text-sm text-gray-500">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </Typography>
+                    <Typography variant="body2" className="text-xs text-gray-500">
+                      XLSX or XLS
+                    </Typography>
+                  </Box>
+                  <input
+                    id="dropzone-file"
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
+                  />
+                </label>
+              ) : null}
+            </Box>
+          </Paper>
+        ) : null
+      }
+
+      {!isLoading && data.length > 0 && (
         <>
-          <StyledTableContainer component={Paper}>
-            <Table>
-              <StyledTableHead>
-                <TableRow>
-                  {columns.map((column) => (
-                    <StyledTableCell
-                      key={column.id}
-                      onClick={() => handleSort(column.id)}
-                    >
-                      {column.label}
-                    </StyledTableCell>
-                  ))}
-                </TableRow>
-              </StyledTableHead>
-              <TableBody>
-                {data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
-                  <StyledTableRow key={row.id} onClick={() => handleRowClick(row)} style={getRowStyle(row)}>
-                    <TableCell>{row.id}</TableCell>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.countSum}</TableCell>
-                    <TableCell>{row.occurrences}</TableCell>
-                  </StyledTableRow>
+          <Box className="flex space-x-4 mb-8">
+            <FormControl className="w-1/2">
+              <InputLabel id="username-select-label">Username</InputLabel>
+              <Select
+                labelId="username-select-label"
+                value={username}
+                label="Username"
+                onChange={(e) => setUsername(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {usernames.map((item, i) => (
+                  <MenuItem key={i} value={item}>
+                    {item}
+                  </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+
+            <FormControl className="w-1/2">
+              <InputLabel id="provider-select-label">Provider</InputLabel>
+              <Select
+                labelId="provider-select-label"
+                value={provider}
+                label="Provider"
+                onChange={(e) => setProvider(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {providers.map((item, i) => (
+                  <MenuItem key={i} value={item}>
+                    {item}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <div>
+            <DataSummary data={filteredOrders} />
+          </div>
+
+          <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Service ID</TableCell>
+                  <TableCell>Service</TableCell>
+                  <TableCell onClick={() => handleSort('totalCharge')} style={{ cursor: 'pointer' }}>
+                    Total Charge
+                  </TableCell>
+                  <TableCell onClick={() => handleSort('quantity')} style={{ cursor: 'pointer' }}>
+                    Quantity
+                  </TableCell>
+                  <TableCell onClick={() => handleSort('latestCreated')} style={{ cursor: 'pointer' }}>
+                    Latest Created
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sortedServices
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row) => {
+                    // Calculate if the row should be highlighted
+                    const latestCreatedDate = new Date(row.latestCreated);
+                    const isOlderThan3Days = maxDate && 
+                      ((maxDate.getTime() - latestCreatedDate.getTime()) / (1000 * 3600 * 24)) >= 3;
+
+                    const rowStyle = isOlderThan3Days 
+                      ? { backgroundColor: '#ffcccc', color: 'black' } 
+                      : {};
+
+                    return (
+                      <TableRow
+                        onClick={() => {
+                          setUserServicesID(row.Service_ID);
+                          openChartModal();
+                        }}
+                        key={row.Service_ID}
+                        className='cursor-pointer'
+                        style={rowStyle} 
+                      >
+                        <TableCell>{row.Service_ID}</TableCell>
+                        <TableCell>{row.Service}</TableCell>
+                        <TableCell>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.totalCharge)}</TableCell>
+                        <TableCell>{row.quantity}</TableCell>
+                        <TableCell>{new Date(row.latestCreated).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
-          </StyledTableContainer>
+          </TableContainer>
 
           <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100, 1000]}
             component="div"
-            count={data.length}
+            count={sortedServices.length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: 3 }}>
-            <ActionButton
-              variant="contained"
-              onClick={handleDownload}
-              startIcon={<Download />}
-              sx={{ backgroundColor: downloadColor, color: 'white', '&:hover': { backgroundColor: '#4DEF6F' } }}
-            >
-              Download Excel
-            </ActionButton>
-            <ActionButton
-              variant="contained"
-              onClick={handleDeleteData}
-              startIcon={<Delete />}
-              sx={{ backgroundColor: deleteColor, '&:hover': { backgroundColor: '#EF4D4D' } }}
-            >
-              Delete Data
-            </ActionButton>
-          </Box>
-
-          <Modal
-            open={modalOpen}
-            onClose={handleCloseModal}
-            closeAfterTransition
-            BackdropComponent={Backdrop}
-            BackdropProps={{
-              timeout: 500,
-            }}
-          >
-            <Fade in={modalOpen}>
-              <ModalContent>
-                <Typography variant="h5" sx={{ marginBottom: 3, color: primaryColor, fontWeight: 'bold' }}>
-                {selectedData?.name}
-                </Typography>
-                <Line data={getChartData(selectedData)} options={chartOptions} />
-              </ModalContent>
-            </Fade>
-          </Modal>
+          <Dialog open={openModal} onClose={closeChartModal} maxWidth="xl" fullWidth>
+            <DialogTitle>Service Data Overview</DialogTitle>
+            <DialogContent>
+              <Box className="flex">
+                <Box className="flex-1" style={{ flex: 2 }}>
+                  <MUILineChart data={userServices} />
+                </Box>
+                <Box className="flex-1" style={{ flex: 1 }}>
+                  <MUIDoughnutChart data={userDoughnotServices} />
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeChartModal} color="primary">Close</Button>
+            </DialogActions>
+          </Dialog>
         </>
       )}
     </Box>
-  );
-};
+  )
+}
 
-export default ExcelProcessor;
-
+export default ExcelProcessor
