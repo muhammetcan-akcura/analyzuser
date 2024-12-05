@@ -100,6 +100,7 @@ const ExcelProcessor = () => {
         setLoadingProgress(0)
       }
     }
+    
 
     reader.onerror = (error) => {
       console.error('File reading error:', error)
@@ -157,7 +158,14 @@ const ExcelProcessor = () => {
 
     setServices([...servicesMap.values()])
   }, [username, provider, chargeFilter, quantityFilter, data])
+  const latestEntry = data && data.length > 0
+  ? data.reduce((latest, current) => {
+      return new Date(current.Created) > new Date(latest.Created) ? current : latest;
+    })
+  : null; 
 
+  
+  console.log(latestEntry?.Created)
   useEffect(() => {
     if (userServicesID !== null) {
       const filteredOrders = data.filter((item) => {
@@ -346,40 +354,45 @@ const ExcelProcessor = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedServices
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((row) => {
-                    const latestCreatedDate = new Date(row.latestCreated);
-                    const isOlderThan3Days = maxDate && 
-                      ((maxDate.getTime() - latestCreatedDate.getTime()) / (1000 * 3600 * 24)) >= 3;
+  {sortedServices
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+    .map((row) => {
+      // Satırdaki tarih (string formatında)
+      const latestCreatedDate = new Date(row.latestCreated);
 
-                    const rowStyle = isOlderThan3Days 
-                      ? { backgroundColor: '#ffcccc', color: 'black' } 
-                      : {};
+      // latestEntry.Created ile karşılaştırıyoruz
+      const isOlderThan3Days = latestEntry?.Created && 
+        (new Date(latestEntry.Created).getTime() - latestCreatedDate.getTime()) >= (3 * 24 * 60 * 60 * 1000);
 
-                    return (
-                      <TableRow
-                        onClick={() => openChartModal(row.Service_ID)}
-                        key={row.Service_ID}
-                        className='cursor-pointer'
-                        style={rowStyle} 
-                      >
-                        <TableCell>{row.Service_ID}</TableCell>
-                        <TableCell>{row.Service}</TableCell>
-                        <TableCell>
-                          {new Intl.NumberFormat('en-US', { 
-                            style: 'currency', 
-                            currency: 'USD' 
-                          }).format(row.totalCharge)}
-                        </TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                        <TableCell>
-                          {new Date(row.latestCreated).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
+      // Eğer son tarih 3 günden eskiyse, satırı kırmızı yap
+      const rowStyle = isOlderThan3Days 
+        ? { backgroundColor: '#ffcccc', color: 'black' } 
+        : {};  // Eski değilse herhangi bir stil uygulama
+
+      return (
+        <TableRow
+          onClick={() => openChartModal(row.Service_ID)}
+          key={row.Service_ID}
+          className='cursor-pointer'
+          style={rowStyle}  // Burada satırın stilini uyguluyoruz
+        >
+          <TableCell>{row.Service_ID}</TableCell>
+          <TableCell>{row.Service}</TableCell>
+          <TableCell>
+            {new Intl.NumberFormat('en-US', { 
+              style: 'currency', 
+              currency: 'USD' 
+            }).format(row.totalCharge)}
+          </TableCell>
+          <TableCell>{row.quantity}</TableCell>
+          <TableCell>
+            {new Date(row.latestCreated).toLocaleDateString()}
+          </TableCell>
+        </TableRow>
+      );
+    })}
+</TableBody>
+
             </Table>
           </TableContainer>
 
