@@ -1,5 +1,5 @@
 import {
-  IconAperture, IconCopy, IconLayoutDashboard, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
+  IconAperture, IconCopy, IconEyeDollar, IconLayoutDashboard, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
 } from '@tabler/icons-react';
 
 import { uniqueId } from 'lodash';
@@ -21,7 +21,12 @@ const Menuitems = [
     icon: IconUser,
     href: '/user-analyze',
   },
-
+  {
+    id: uniqueId(),
+    title: 'Rates Control',
+    icon: IconEyeDollar,
+    href: '/rates',
+  },
   {
     id: uniqueId(),
     title: 'Dashboard',
@@ -76,6 +81,12 @@ const Menuitems = [
     title: 'Sample Page',
     icon: IconAperture,
     href: '/sample-page',
+  },
+  {
+    id: uniqueId(),
+    title: 'wp',
+    icon: IconEyeDollar,
+    href: 'https://www.pullsms.com.tr/',
   },
 ];
 

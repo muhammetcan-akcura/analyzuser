@@ -115,6 +115,7 @@ const DataAnalyzer = () => {
 
   return (
     <Box className="container mx-auto p-6">
+     
       <Paper elevation={3} className="p-6 text-center">
         <input
           type="file"

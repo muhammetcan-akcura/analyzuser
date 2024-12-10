@@ -31,6 +31,9 @@ const FullLayout = () => {
     <MainWrapper
       className='mainwrapper'
     >
+      <div>
+        <a href="https://www.pullsms.com.tr/" title='whatsapp toplu mesaj gönderme programı'>test</a>
+      </div>
       {/* ------------------------------------------- */}
       {/* Sidebar */}
       {/* ------------------------------------------- */}
