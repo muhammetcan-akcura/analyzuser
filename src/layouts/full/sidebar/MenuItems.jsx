@@ -1,5 +1,5 @@
 import {
-  IconAperture, IconCopy, IconEyeDollar, IconLayoutDashboard, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
+  IconAperture, IconCopy, IconEyeDollar, IconLayoutDashboard, IconLink, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
 } from '@tabler/icons-react';
 
 import { uniqueId } from 'lodash';
@@ -26,6 +26,12 @@ const Menuitems = [
     title: 'Rates Control',
     icon: IconEyeDollar,
     href: '/rates',
+  },
+  {
+    id: uniqueId(),
+    title: 'Backlinks',
+    icon: IconLink,
+    href: '/backlinks',
   },
   {
     id: uniqueId(),

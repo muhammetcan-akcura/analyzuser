@@ -11,6 +11,7 @@ const Dashboard = Loadable(lazy(() => import('../views/dashboard/Dashboard')))
 const UserAnalyze = Loadable(lazy(() => import('../views/userAnalyze/userAnalyze')))
 const OrderAnalyze = Loadable(lazy(() => import('../views/userAnalyze/index')))
 const Rates = Loadable(lazy(() => import('../views/rates')))
+const Backlinks = Loadable(lazy(() => import('../views/backlinks')))
 const SamplePage = Loadable(lazy(() => import('../views/sample-page/SamplePage')))
 const Icons = Loadable(lazy(() => import('../views/icons/Icons')))
 const TypographyPage = Loadable(lazy(() => import('../views/utilities/TypographyPage')))
@@ -29,6 +30,7 @@ const Router = [
       { path: '/order-analyze', exact: true, element: <OrderAnalyze /> },
       { path: '/user-analyze', exact: true, element: <UserAnalyze /> },
       { path: '/rates', exact: true, element: <Rates /> },
+      { path: '/backlinks', exact: true, element: <Backlinks /> },
       { path: '/sample-page', exact: true, element: <SamplePage /> },
       { path: '/icons', exact: true, element: <Icons /> },
       { path: '/ui/typography', exact: true, element: <TypographyPage /> },
