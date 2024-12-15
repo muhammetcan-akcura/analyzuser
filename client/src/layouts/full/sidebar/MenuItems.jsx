@@ -1,5 +1,5 @@
 import {
-  IconAperture, IconCopy, IconEyeDollar, IconLayoutDashboard, IconLink, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
+  IconAperture, IconBrandSkype, IconCopy, IconEyeDollar, IconLayoutDashboard, IconLink, IconLogin, IconMenuOrder, IconMoodHappy, IconTypography, IconUser, IconUserPlus
 } from '@tabler/icons-react';
 
 import { uniqueId } from 'lodash';
@@ -32,6 +32,12 @@ const Menuitems = [
     title: 'Backlinks',
     icon: IconLink,
     href: '/backlinks',
+  },
+  {
+    id: uniqueId(),
+    title: 'Skype bot',
+    icon: IconBrandSkype,
+    href: '/skypebot',
   },
   {
     id: uniqueId(),
