@@ -60,49 +60,55 @@ function ExcelUploadAndDisplay() {
     return (
         <div>
             <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} />
-            <input
-                value={globalFilter || ''}
-                onChange={(e) => setGlobalFilter(e.target.value || undefined)}
-                placeholder="Search all columns"
-            />
+            {data.length > 0 && (
+                <div>
+                    {/* Search input */}
+                    <input
+                        value={globalFilter || ''}
+                        onChange={(e) => setGlobalFilter(e.target.value || undefined)}
+                        placeholder="Search all columns"
+                        style={{ margin: '10px 0', padding: '5px' }}
+                    />
 
-            {/* Button to copy all source URLs */}
-            <button onClick={handleCopySourceUrls}>
-                Copy All Source URLs
-            </button>
+                    {/* Button to copy all source URLs */}
+                    <button onClick={handleCopySourceUrls} style={{ marginBottom: '10px' }}>
+                        Copy All Source URLs
+                    </button>
 
-            <table {...getTableProps()} border="1">
-                <thead>
-                    {headerGroups.map(headerGroup => (
-                        <tr {...headerGroup.getHeaderGroupProps()}>
-                            {headerGroup.headers.map(column => (
-                                <th {...column.getHeaderProps(column.getSortByToggleProps())}>
-                                    {column.render('Header')}
-                                    <span>
-                                        {column.isSorted
-                                            ? column.isSortedDesc
-                                                ? ' 🔽'
-                                                : ' 🔼'
-                                            : ''}
-                                    </span>
-                                </th>
+                    <table {...getTableProps()} border="1">
+                        <thead>
+                            {headerGroups.map(headerGroup => (
+                                <tr {...headerGroup.getHeaderGroupProps()}>
+                                    {headerGroup.headers.map(column => (
+                                        <th {...column.getHeaderProps(column.getSortByToggleProps())}>
+                                            {column.render('Header')}
+                                            <span>
+                                                {column.isSorted
+                                                    ? column.isSortedDesc
+                                                        ? ' 🔽'
+                                                        : ' 🔼'
+                                                    : ''}
+                                            </span>
+                                        </th>
+                                    ))}
+                                </tr>
                             ))}
-                        </tr>
-                    ))}
-                </thead>
-                <tbody {...getTableBodyProps()}>
-                    {rows.map(row => {
-                        prepareRow(row);
-                        return (
-                            <tr {...row.getRowProps()}>
-                                {row.cells.map(cell => {
-                                    return <td {...cell.getCellProps()}>{cell.render('Cell')}</td>;
-                                })}
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                        </thead>
+                        <tbody {...getTableBodyProps()}>
+                            {rows.map(row => {
+                                prepareRow(row);
+                                return (
+                                    <tr {...row.getRowProps()}>
+                                        {row.cells.map(cell => {
+                                            return <td {...cell.getCellProps()}>{cell.render('Cell')}</td>;
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }

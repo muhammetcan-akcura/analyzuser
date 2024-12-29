@@ -9,75 +9,115 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // Genel amaçlı Python script çalıştırma fonksiyonu
-function runPythonScript(scriptPath, args, res) {
-    const pythonProcess = spawn('python3', [scriptPath, ...args]);
-    let outputData = '';
+function runPythonScript(scriptPath, args) {
+    return new Promise((resolve, reject) => {
+        const pythonProcess = spawn('python3', [scriptPath, ...args]);
+        let outputData = '';
+        let errorData = '';
 
-    pythonProcess.stdout.on('data', (data) => {
-        outputData += data.toString();
-    });
+        pythonProcess.stdout.on('data', (data) => {
+            outputData += data.toString();
+        });
 
-    pythonProcess.stderr.on('data', (data) => {
-        console.error(`Hata: ${data}`);
-        if (!res.headersSent) {
-            const errorMsg = data.toString().includes('Rate limit exceeded') 
-                ? "Rate limit aşıldı, lütfen daha sonra tekrar deneyin." 
-                : "Kimlik doğrulama işlemi başarısız";
+        pythonProcess.stderr.on('data', (data) => {
+            errorData += data.toString();
+            console.error(`Python Error: ${data}`);
+        });
 
-            res.status(500).json({
+        pythonProcess.on('close', (code) => {
+            if (code !== 0) {
+                reject({
+                    success: false,
+                    error: errorData || "Script execution failed",
+                    code: code
+                });
+                return;
+            }
+
+            try {
+                const result = JSON.parse(outputData);
+                resolve(result);
+            } catch (error) {
+                reject({
+                    success: false,
+                    error: "Invalid JSON response from Python script",
+                    details: outputData
+                });
+            }
+        });
+
+        pythonProcess.on('error', (error) => {
+            reject({
                 success: false,
-                error: errorMsg
+                error: "Failed to start Python script",
+                details: error.message
             });
-        }
-    });
-
-    pythonProcess.on('close', (code) => {
-        if (res.headersSent) return; // Eğer yanıt gönderildiyse işlemi sonlandırın
-        try {
-            const result = JSON.parse(outputData);
-            res.json(result);
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                error: "Yanıt işlenemedi"
-            });
-        }
+        });
     });
 }
 
 // Login endpoint
-app.post("/login", (req, res) => {
-    const { email, password } = req.body;
+app.post("/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: "E-posta ve şifre gereklidir"
+            });
+        }
+
+        const result = await runPythonScript('./skype_login.py', [email, password]);
+        res.json(result);
+    } catch (error) {
+        console.error("Login Error:", error);
+        res.status(500).json({
             success: false,
-            error: "E-posta ve şifre gereklidir"
+            error: error.error || "Beklenmeyen bir hata oluştu",
+            details: error.details || null
         });
     }
-
-    runPythonScript('./skype_login.py', [email, password], res);
 });
 
 // Send message endpoint
-app.post("/send-message", (req, res) => {
-    const { email, password, recipients, message } = req.body;
+app.post("/send-message", async (req, res) => {
+    try {
+        const { email, password, recipients, message } = req.body;
 
-    if (!email || !password || !recipients || !message) {
-        return res.status(400).json({
+        if (!email || !password || !recipients || !message) {
+            return res.status(400).json({
+                success: false,
+                error: "Eksik bilgi"
+            });
+        }
+
+        const result = await runPythonScript('./skype_send_message.py', [
+            email,
+            password,
+            JSON.stringify(recipients),
+            message
+        ]);
+        res.json(result);
+    } catch (error) {
+        console.error("Message Sending Error:", error);
+        res.status(500).json({
             success: false,
-            error: "Eksik bilgi"
+            error: error.error || "Mesaj gönderirken bir hata oluştu",
+            details: error.details || null
         });
     }
-
-    runPythonScript('./skype_send_message.py', [
-        email,
-        password,
-        JSON.stringify(recipients),
-        message
-    ], res);
 });
 
-// Sunucu başlatma
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        error: "Sunucu hatası",
+        details: err.message
+    });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Sunucu ${PORT} portunda çalışıyor`));
