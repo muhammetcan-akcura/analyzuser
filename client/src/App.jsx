@@ -1,25 +1,25 @@
-// import { useState } from 'react'
-// import reactLogo from './assets/react.svg'
-// import viteLogo from '/vite.svg'
-// import './App.css'
-
+// src/App.js
+import React from 'react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { useRoutes } from 'react-router-dom';
 import Router from './routes/Router';
+import { baselightTheme } from './theme/DefaultColors';
+import { QueryClient, QueryClientProvider } from 'react-query';
 
-import { baselightTheme } from "./theme/DefaultColors";
+const queryClient = new QueryClient();
 
 function App() {
-  
-  const routing = useRoutes(Router);
   const theme = baselightTheme;
+  const routing = useRoutes(Router);
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      {routing}
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {routing}
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
-export default App
+export default App;

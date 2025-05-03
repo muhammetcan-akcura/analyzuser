@@ -11,6 +11,18 @@ const Menuitems = [
   },
   {
     id: uniqueId(),
+    title: 'Orders',
+    icon: IconMenuOrder,
+    href: '/orders',
+  },
+  {
+    id: uniqueId(),
+    title: 'Service Speed',
+    icon: IconMenuOrder,
+    href: '/serviceSpeed',
+  },
+  {
+    id: uniqueId(),
     title: 'Order Analyze',
     icon: IconMenuOrder,
     href: '/order-analyze',

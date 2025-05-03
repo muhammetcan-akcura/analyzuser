@@ -12,6 +12,8 @@ const UserAnalyze = Loadable(lazy(() => import('../views/userAnalyze/userAnalyze
 const OrderAnalyze = Loadable(lazy(() => import('../views/userAnalyze/index')))
 const Rates = Loadable(lazy(() => import('../views/rates')))
 const Backlinks = Loadable(lazy(() => import('../views/backlinks')))
+const Orders = Loadable(lazy(() => import('../views/orders/ordersPage')))
+const ServiceSpeed = Loadable(lazy(() => import('../views/orders/serviceSpeed')))
 const SkypeBot = Loadable(lazy(() => import('../views/skypeBot')))
 const SamplePage = Loadable(lazy(() => import('../views/sample-page/SamplePage')))
 const Icons = Loadable(lazy(() => import('../views/icons/Icons')))
@@ -32,6 +34,8 @@ const Router = [
       { path: '/user-analyze', exact: true, element: <UserAnalyze /> },
       { path: '/rates', exact: true, element: <Rates /> },
       { path: '/backlinks', exact: true, element: <Backlinks /> },
+      { path: '/orders', exact: true, element: <Orders /> },
+      { path: '/serviceSpeed', exact: true, element: <ServiceSpeed /> },
       { path: '/skypebot', exact: true, element: <SkypeBot /> },
       { path: '/sample-page', exact: true, element: <SamplePage /> },
       { path: '/icons', exact: true, element: <Icons /> },
