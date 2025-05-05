@@ -24,6 +24,8 @@ import {
     Modal,
     Paper,
     Divider,
+    Tabs,
+    Tab,
 } from "@mui/material"
 import { format } from "date-fns"
 
@@ -72,6 +74,7 @@ export default function OrderSummary() {
     const [fileName, setFileName] = useState("")
     const [searchTerm, setSearchTerm] = useState("")
     const [sortBy, setSortBy] = useState("none") // none, totalSpent, totalOrders
+    const [tabValue, setTabValue] = useState(0) // 0: Tüm Servisler, 1: Sipariş Kesilmiş Servisler
 
     // Modal state
     const [modalOpen, setModalOpen] = useState(false)
@@ -120,6 +123,7 @@ export default function OrderSummary() {
         setSelectedUser(user)
         setSearchTerm("")
         setSortBy("none")
+        setTabValue(0) // Kullanıcı değiştiğinde tab'ı ilk tab'a reset et
         const userOrders = data.filter((row) => row.User === user && row.Status === "Completed")
         const services = {}
         const allDatesSet = new Set()
@@ -139,6 +143,10 @@ export default function OrderSummary() {
         setSummaryTable(services)
     }
 
+    const handleTabChange = (event, newValue) => {
+        setTabValue(newValue)
+    }
+
     // Calculate totals for each service
     const servicesWithTotals = useMemo(() => {
         const result = []
@@ -146,6 +154,17 @@ export default function OrderSummary() {
         Object.entries(summaryTable).forEach(([service, serviceData]) => {
             let totalOrders = 0
             let totalSpent = 0
+            let hasGaps = false // Bu servis için sipariş kesilmesi var mı kontrol et
+            
+            // Her servis için tüm günlerde sipariş var mı diye kontrol et
+            if (dates.length > 0) {
+                for (const date of dates) {
+                    if (!serviceData[date] || serviceData[date].count === 0) {
+                        hasGaps = true
+                        break
+                    }
+                }
+            }
 
             Object.values(serviceData).forEach((entry) => {
                 totalOrders += entry.count
@@ -157,15 +176,21 @@ export default function OrderSummary() {
                 serviceData,
                 totalOrders,
                 totalSpent,
+                hasGaps,  // Sipariş kesilmeleri olan servisler için flag
             })
         })
 
         return result
-    }, [summaryTable])
+    }, [summaryTable, dates])
 
     // Filter and sort services
     const filteredAndSortedServices = useMemo(() => {
         let result = [...servicesWithTotals]
+
+        // Tab'a göre filtreleme yap
+        if (tabValue === 1) { // Sipariş Kesilmiş Servisler
+            result = result.filter(item => item.hasGaps)
+        }
 
         // Filter by search term
         if (searchTerm) {
@@ -180,7 +205,7 @@ export default function OrderSummary() {
         }
 
         return result
-    }, [servicesWithTotals, searchTerm, sortBy])
+    }, [servicesWithTotals, searchTerm, sortBy, tabValue])
 
     // Handle cell click to open modal
     const handleCellClick = (service, date, entry) => {
@@ -202,13 +227,14 @@ export default function OrderSummary() {
 
     // Add a new function to handle service click for details
     const handleServiceClick = (service, serviceData) => {
-        // Prepare daily data for the charts
+        // Prepare daily data for the charts - all dates, with 0 for missing days
         const dailyData = dates.map((date) => {
             const entry = serviceData[date] || { count: 0, spent: 0 }
             return {
                 date,
                 count: entry.count,
                 spent: entry.spent,
+                hasOrder: entry.count > 0 // Siparişi var mı yok mu
             }
         })
 
@@ -217,6 +243,8 @@ export default function OrderSummary() {
             dailyData,
             totalOrders: dailyData.reduce((sum, day) => sum + day.count, 0),
             totalSpent: dailyData.reduce((sum, day) => sum + day.spent, 0),
+            // Sipariş kesilme günlerini hesapla
+            gapDays: dailyData.filter(day => day.count === 0).map(day => day.date)
         })
         setModalOpen(true)
     }
@@ -396,6 +424,78 @@ export default function OrderSummary() {
                             </Typography>
                         </div>
 
+                        {/* Tabs for filtering orders */}
+                        <div className="bg-white border-b">
+                            <Tabs 
+                                value={tabValue} 
+                                onChange={handleTabChange} 
+                                variant="fullWidth"
+                                className="border-b"
+                                sx={{
+                                    "& .MuiTab-root": {
+                                        fontWeight: 500,
+                                        py: 1.5,
+                                    },
+                                    "& .Mui-selected": {
+                                        color: "rgb(37, 99, 235) !important",
+                                    },
+                                    "& .MuiTabs-indicator": {
+                                        backgroundColor: "rgb(37, 99, 235)",
+                                        height: 3,
+                                    },
+                                }}
+                            >
+                                <Tab 
+                                    label={
+                                        <div className="flex items-center space-x-2">
+                                            <svg 
+                                                className="w-5 h-5" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24" 
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round" 
+                                                    strokeWidth="2" 
+                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                                ></path>
+                                            </svg>
+                                            <span>Tüm Servisler</span>
+                                            <span className="ml-1.5 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                                {servicesWithTotals.length}
+                                            </span>
+                                        </div>
+                                    } 
+                                />
+                                <Tab 
+                                    label={
+                                        <div className="flex items-center space-x-2">
+                                            <svg 
+                                                className="w-5 h-5" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24" 
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round" 
+                                                    strokeWidth="2" 
+                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                                ></path>
+                                            </svg>
+                                            <span>Sipariş Kesilmiş Servisler</span>
+                                            <span className="ml-1.5 bg-amber-100 text-amber-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                                {servicesWithTotals.filter(item => item.hasGaps).length}
+                                            </span>
+                                        </div>
+                                    } 
+                                />
+                            </Tabs>
+                        </div>
+
                         <div className="p-5 bg-white border-b flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <TextField
                                 label="Servis Ara"
@@ -506,13 +606,18 @@ export default function OrderSummary() {
                                         <TableCell align="center" className="font-semibold bg-green-50 text-green-800">
                                             Toplam Tutar
                                         </TableCell>
+                                        {tabValue === 1 && (
+                                            <TableCell align="center" className="font-semibold bg-amber-50 text-amber-800">
+                                                Durum
+                                            </TableCell>
+                                        )}
                                         <TableCell align="center" className="font-semibold text-gray-700">
                                             Detay
                                         </TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {filteredAndSortedServices.map(({ service, serviceData, totalOrders, totalSpent }) => (
+                                    {filteredAndSortedServices.map(({ service, serviceData, totalOrders, totalSpent, hasGaps }) => (
                                         <TableRow key={service} className="transition-colors">
                                             <TableCell className="font-medium text-gray-800">{service}</TableCell>
                                             <TableCell align="center" className="bg-blue-50">
@@ -525,65 +630,39 @@ export default function OrderSummary() {
                                                     ${totalSpent.toFixed(2)}
                                                 </span>
                                             </TableCell>
-                                            <TableCell align="center">
-                                                <Button
-                                                    variant="outlined"
-                                                    size="small"
-                                                    onClick={() => handleServiceClick(service, serviceData)}
-                                                    className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400 transition-colors"
-                                                    startIcon={
-                                                        <svg
-                                                            className="w-4 h-4"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
+                                            {tabValue === 1 && (
+                                                <TableCell align="center" className="bg-amber-50">
+                                                    <span className="font-medium text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full flex items-center justify-center gap-1.5">
+                                                        <svg 
+                                                            className="w-4 h-4" 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            viewBox="0 0 24 24" 
                                                             xmlns="http://www.w3.org/2000/svg"
                                                         >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth="2"
-                                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                                            ></path>
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth="2"
-                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                                            <path 
+                                                                strokeLinecap="round" 
+                                                                strokeLinejoin="round" 
+                                                                strokeWidth="2" 
+                                                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                                                             ></path>
                                                         </svg>
-                                                    }
+                                                        Kesintili
+                                                    </span>
+                                                </TableCell>
+                                            )}
+                                            <TableCell align="center">
+                                                <Button
+                                                    variant="text"
+                                                    onClick={() => handleServiceClick(service, serviceData)}
+                                                    className="text-blue-600 hover:text-blue-800 font-medium"
+                                                    sx={{
+                                                        minWidth: "auto",
+                                                        textTransform: "none",
+                                                    }}
                                                 >
-                                                    Detay Gör
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-
-                                    {/* Grand Total Row */}
-                                    {filteredAndSortedServices.length > 0 && (
-                                        <TableRow className="bg-gradient-to-r from-gray-100 to-gray-50">
-                                            <TableCell className="font-bold text-gray-800">GENEL TOPLAM</TableCell>
-                                            <TableCell align="center" className="font-bold text-blue-800">
-                                                <div className="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg inline-block">
-                                                    {filteredAndSortedServices.reduce((sum, item) => sum + item.totalOrders, 0)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell align="center" className="font-bold text-green-800">
-                                                <div className="bg-green-200 text-green-800 px-3 py-1.5 rounded-lg inline-block">
-                                                    ${filteredAndSortedServices.reduce((sum, item) => sum + item.totalSpent, 0).toFixed(2)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell></TableCell>
-                                        </TableRow>
-                                    )}
-
-                                    {filteredAndSortedServices.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={4} align="center" className="py-12">
-                                                <div className="flex flex-col items-center">
                                                     <svg
-                                                        className="w-12 h-12 text-gray-300 mb-3"
+                                                        className="w-5 h-5 mr-1"
                                                         fill="none"
                                                         stroke="currentColor"
                                                         viewBox="0 0 24 24"
@@ -593,84 +672,134 @@ export default function OrderSummary() {
                                                             strokeLinecap="round"
                                                             strokeLinejoin="round"
                                                             strokeWidth="2"
-                                                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                        ></path>
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                                         ></path>
                                                     </svg>
-                                                    <Typography variant="body1" className="text-gray-500 font-medium">
-                                                        Arama kriterlerine uygun servis bulunamadı.
-                                                    </Typography>
-                                                </div>
+                                                    Detay
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
-                                    )}
+                                    ))}
                                 </TableBody>
                             </Table>
                         </div>
+
+                        {filteredAndSortedServices.length === 0 && (
+                            <Box className="p-8 text-center">
+                                <div className="mx-auto w-16 h-16 mb-4 flex items-center justify-center rounded-full bg-gray-100">
+                                    <svg
+                                        className="w-8 h-8 text-gray-400"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth="2"
+                                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        ></path>
+                                    </svg>
+                                </div>
+                                <Typography className="text-gray-500 font-medium">
+                                    Hiç servis bulunamadı
+                                </Typography>
+                                <Typography variant="body2" className="text-gray-400 mt-1">
+                                    Filtreleri temizleyerek tüm servisleri görebilirsiniz
+                                </Typography>
+                            </Box>
+                        )}
                     </CardContent>
                 </Card>
             )}
 
-            {/* Detail Modal */}
-            <Modal
-                open={modalOpen}
-                onClose={handleCloseModal}
-                aria-labelledby="order-detail-modal"
-                aria-describedby="order-detail-for-service"
-            >
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl">
-                    <Paper className="p-6 rounded-xl shadow-2xl border border-gray-100">
-                        {selectedCell && (
-                            <>
-                                <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                                    <Typography variant="h6" className="font-bold text-gray-800 flex items-center">
-                                        <svg
-                                            className="w-5 h-5 mr-2 text-blue-600"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth="2"
-                                                d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                            ></path>
-                                        </svg>
-                                        {selectedCell.service} - Sipariş Özeti
-                                    </Typography>
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        onClick={handleCloseModal}
-                                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                                        startIcon={
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth="2"
-                                                    d="M6 18L18 6M6 6l12 12"
-                                                ></path>
-                                            </svg>
-                                        }
+            {/* Modal for details */}
+            <Modal open={modalOpen} onClose={handleCloseModal}>
+                <Paper className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 rounded-xl shadow-2xl">
+                    {selectedCell && selectedCell.dailyData ? (
+                        // Service detail view
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <Typography variant="h6" className="font-bold text-gray-800 flex items-center">
+                                    <svg
+                                        className="w-5 h-5 mr-2 text-blue-600"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        Kapat
-                                    </Button>
-                                </div>
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth="2"
+                                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        ></path>
+                                    </svg>
+                                    {selectedCell.service} - Servis Detayı
+                                </Typography>
+                                <Button
+                                    onClick={handleCloseModal}
+                                    size="small"
+                                    className="min-w-[24px] h-[24px] p-0 text-gray-500 hover:text-gray-700"
+                                >
+                                    <svg
+                                        className="w-5 h-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth="2"
+                                            d="M6 18L18 6M6 6l12 12"
+                                        ></path>
+                                    </svg>
+                                </Button>
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Left side - Order details */}
-                                    <div className="border rounded-xl p-5 bg-gradient-to-b from-white to-gray-50 shadow-sm">
-                                        <Typography variant="subtitle1" className="font-semibold mb-4 text-gray-800 flex items-center">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <Paper className="p-4 rounded-xl bg-blue-50 border border-blue-100 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 rounded-bl-full opacity-70"></div>
+                                    <Typography variant="subtitle1" className="font-medium text-blue-800 mb-1">
+                                        Toplam Sipariş
+                                    </Typography>
+                                    <Typography variant="h4" className="font-bold text-blue-900">
+                                        {selectedCell.totalOrders}
+                                    </Typography>
+                                    <Typography variant="body2" className="text-blue-700 mt-1">
+                                        Bu servisten toplam sipariş sayısı
+                                    </Typography>
+                                </Paper>
+
+                                <Paper className="p-4 rounded-xl bg-green-50 border border-green-100 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-green-100 rounded-bl-full opacity-70"></div>
+                                    <Typography variant="subtitle1" className="font-medium text-green-800 mb-1">
+                                        Toplam Tutar
+                                    </Typography>
+                                    <Typography variant="h4" className="font-bold text-green-900">
+                                        ${selectedCell.totalSpent.toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="body2" className="text-green-700 mt-1">
+                                        Bu servis için toplam harcama
+                                    </Typography>
+                                </Paper>
+                            </div>
+
+                            {selectedCell.gapDays.length > 0 && (
+                                <Paper className="p-4 rounded-xl bg-amber-50 border border-amber-100 mb-6">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 bg-amber-100 rounded-lg mt-1">
                                             <svg
-                                                className="w-5 h-5 mr-2 text-blue-600"
+                                                className="w-5 h-5 text-amber-700"
                                                 fill="none"
                                                 stroke="currentColor"
                                                 viewBox="0 0 24 24"
@@ -680,103 +809,108 @@ export default function OrderSummary() {
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
                                                     strokeWidth="2"
-                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                                                 ></path>
                                             </svg>
-                                            Sipariş Detayları
-                                        </Typography>
-
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:border-blue-200 transition-colors">
-                                                <Typography variant="body1" className="text-gray-700">
-                                                    Toplam Sipariş Sayısı
-                                                </Typography>
-                                                <Typography
-                                                    variant="body1"
-                                                    className="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full"
-                                                >
-                                                    {selectedCell.totalOrders}
-                                                </Typography>
-                                            </div>
-
-                                            <div className="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:border-green-200 transition-colors">
-                                                <Typography variant="body1" className="text-gray-700">
-                                                    Toplam Harcama
-                                                </Typography>
-                                                <Typography
-                                                    variant="body1"
-                                                    className="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full"
-                                                >
-                                                    ${selectedCell.totalSpent.toFixed(2)}
-                                                </Typography>
-                                            </div>
-
-                                            <div className="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:border-purple-200 transition-colors">
-                                                <Typography variant="body1" className="text-gray-700">
-                                                    Ortalama Sipariş Tutarı
-                                                </Typography>
-                                                <Typography
-                                                    variant="body1"
-                                                    className="font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full"
-                                                >
-                                                    $
-                                                    {selectedCell.totalOrders > 0
-                                                        ? (selectedCell.totalSpent / selectedCell.totalOrders).toFixed(2)
-                                                        : "0.00"}
-                                                </Typography>
+                                        </div>
+                                        <div>
+                                            <Typography variant="subtitle1" className="font-medium text-amber-800 mb-2">
+                                                Sipariş Kesilme Günleri
+                                            </Typography>
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedCell.gapDays.map((day) => (
+                                                    <span
+                                                        key={day}
+                                                        className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md text-sm font-medium"
+                                                    >
+                                                        {day}
+                                                    </span>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
+                                </Paper>
+                            )}
 
-                                    {/* Right side - Charts */}
-                                    <div className="border rounded-xl p-5 bg-white shadow-sm">
-                                        <Typography variant="subtitle1" className="font-semibold mb-4 text-gray-800 flex items-center">
-                                            <svg
-                                                className="w-5 h-5 mr-2 text-blue-600"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth="2"
-                                                    d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-                                                ></path>
-                                            </svg>
-                                            Görselleştirme
-                                        </Typography>
+                            <Divider className="my-6" />
 
-                                        <div className="space-y-6">
-                                            <SimpleBarChart
-                                                title="Günlük Sipariş Sayısı"
-                                                data={selectedCell.dailyData.map((day) => ({
-                                                    label: day.date,
-                                                    value: day.count,
-                                                    unit: " adet",
-                                                    color: "bg-blue-500",
-                                                }))}
-                                            />
+                            <Typography variant="subtitle1" className="font-semibold text-gray-800 mb-4">
+                                Günlük Sipariş Dağılımı
+                            </Typography>
 
-                                            <Divider className="my-4" />
+                            <SimpleBarChart
+                                title="Günlük Sipariş Sayısı"
+                                data={selectedCell.dailyData.map((day) => ({
+                                    label: day.date,
+                                    value: day.count,
+                                    unit: " adet",
+                                    color: day.count > 0 ? "bg-blue-500" : "bg-red-400",
+                                }))}
+                            />
 
-                                            <SimpleBarChart
-                                                title="Günlük Harcama"
-                                                data={selectedCell.dailyData.map((day) => ({
-                                                    label: day.date,
-                                                    value: day.spent,
-                                                    unit: " $",
-                                                    color: "bg-green-500",
-                                                }))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </Paper>
-                </div>
+                            <div className="h-6" />
+
+                            <SimpleBarChart
+                                title="Günlük Harcama"
+                                data={selectedCell.dailyData.map((day) => ({
+                                    label: day.date,
+                                    value: day.spent,
+                                    unit: " $",
+                                    color: day.spent > 0 ? "bg-green-500" : "bg-gray-300",
+                                }))}
+                            />
+                        </div>
+                    ) : selectedCell ? (
+                        // Hücre detay görünümü
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <Typography variant="h6" className="font-bold text-gray-800">
+                                    {selectedCell.date} - {selectedCell.service}
+                                </Typography>
+                                <Button
+                                    onClick={handleCloseModal}
+                                    size="small"
+                                    className="min-w-[24px] h-[24px] p-0 text-gray-500 hover:text-gray-700"
+                                >
+                                    <svg
+                                        className="w-5 h-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth="2"
+                                            d="M6 18L18 6M6 6l12 12"
+                                        ></path>
+                                    </svg>
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Paper className="p-4 rounded-xl bg-blue-50 border border-blue-100">
+                                    <Typography variant="subtitle1" className="font-medium text-blue-800 mb-1">
+                                        Sipariş Sayısı
+                                    </Typography>
+                                    <Typography variant="h4" className="font-bold text-blue-900">
+                                        {selectedCell.entry.count}
+                                    </Typography>
+                                </Paper>
+
+                                <Paper className="p-4 rounded-xl bg-green-50 border border-green-100">
+                                    <Typography variant="subtitle1" className="font-medium text-green-800 mb-1">
+                                        Toplam Tutar
+                                    </Typography>
+                                    <Typography variant="h4" className="font-bold text-green-900">
+                                        ${selectedCell.entry.spent.toFixed(2)}
+                                    </Typography>
+                                </Paper>
+                            </div>
+                        </div>
+                    ) : null}
+                </Paper>
             </Modal>
         </Box>
     )
